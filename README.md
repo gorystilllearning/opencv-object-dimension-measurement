@@ -16,6 +16,14 @@ python -m pip install -r requirements.txt
 python object_size.py --image images/sample_cm.png --width 2.5
 ```
 
+Di Windows PowerShell, buat dan aktifkan environment dengan perintah berikut,
+lalu lanjutkan dua perintah `python` pada contoh di atas:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
 `--width` adalah lebar objek referensi **paling kiri**, dalam cm, bukan lebar
 benda yang ingin diukur. Contoh sintetis menggunakan referensi persegi 2.5 cm
 di kiri dan target 5 × 5 cm di kanan. Untuk foto sendiri, masukkan ukuran
