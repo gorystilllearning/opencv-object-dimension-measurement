@@ -6,8 +6,6 @@
 #   3. Muhammad Ilham Gymnastiar    (23050874169)
 #   4. Wahyu Rizki Agung Kurniawan  (23050874189)
 # ==========================================================
-# USAGE
-# python object_size.py --image images/sample_cm.png --width 2.5
 
 from scipy.spatial import distance as dist
 from imutils import perspective, contours
