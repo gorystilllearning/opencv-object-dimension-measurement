@@ -1,4 +1,17 @@
-# Pengukuran Dimensi Objek
+﻿# Pengukuran Dimensi Objek
+
+## Identitas Kelompok 8
+
+Proyek UTS Machine Vision.
+
+| No | Nama                          | NIM          |
+|----|-------------------------------|--------------|
+| 1  | Ahmad Bagus Idkholus Surur    | 23050874166  |
+| 2  | Khairie Arrantisy             | 23050874182  |
+| 3  | Muhammad Ilham Gymnastiar     | 23050874169  |
+| 4  | Wahyu Rizki Agung Kurniawan   | 23050874189  |
+
+Repository ini dikembangkan dari proyek sumber yang tercantum di bagian kredit.
 
 Mengukur panjang dan lebar objek pada foto dengan referensi berukuran diketahui.
 Input `--width` dan hasil pengukuran menggunakan **cm**.
@@ -57,3 +70,5 @@ python -m unittest discover -v
 Tes memakai gambar sintetis tanpa membuka jendela. Akurasi foto nyata belum
 dikalibrasi.
 Repository sumber tidak mencantumkan lisensi; periksa izin sebelum distribusi ulang.
+
+Daftar anggota dan kredit lengkap: lihat [AUTHORS.md](AUTHORS.md).

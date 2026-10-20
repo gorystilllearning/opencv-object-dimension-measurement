@@ -1,3 +1,11 @@
+﻿# ==========================================================
+# UTS Machine Vision - Pengukuran Dimensi Objek
+# Kelompok 8
+#   1. Ahmad Bagus Idkholus Surur   (23050874166)
+#   2. Khairie Arrantisy            (23050874182)
+#   3. Muhammad Ilham Gymnastiar    (23050874169)
+#   4. Wahyu Rizki Agung Kurniawan  (23050874189)
+# ==========================================================
 # USAGE
 # python object_size.py --image images/sample_cm.png --width 2.5
 
@@ -14,7 +22,10 @@ def midpoint(ptA, ptB):
 	return ((ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5)
 
 # construct the argument parse and parse the arguments
-ap = argparse.ArgumentParser()
+ap = argparse.ArgumentParser(
+    description="UTS Machine Vision - Kelompok 8: pengukuran dimensi objek dengan OpenCV",
+    epilog="1. Ahmad Bagus Idkholus Surur (23050874166); 2. Khairie Arrantisy (23050874182); 3. Muhammad Ilham Gymnastiar (23050874169); 4. Wahyu Rizki Agung Kurniawan (23050874189)"
+)
 ap.add_argument("-i", "--image", required=True,
 	help="path to the input image")
 ap.add_argument("-w", "--width", type=float, required=True,
@@ -119,5 +130,8 @@ for c in cnts:
 		0.65, (255, 255, 255), 2)
 
 	# show the output image
+	cv2.putText(orig, "Kelompok 8 - UTS Machine Vision",
+	    (10, orig.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX,
+	    0.5, (255, 255, 255), 1)
 	cv2.imshow("Image", orig)
 	cv2.waitKey(0)

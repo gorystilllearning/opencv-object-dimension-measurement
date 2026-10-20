@@ -1,3 +1,11 @@
+﻿# ==========================================================
+# UTS Machine Vision - Pengukuran Dimensi Objek
+# Kelompok 8
+#   1. Ahmad Bagus Idkholus Surur   (23050874166)
+#   2. Khairie Arrantisy            (23050874182)
+#   3. Muhammad Ilham Gymnastiar    (23050874169)
+#   4. Wahyu Rizki Agung Kurniawan  (23050874189)
+# ==========================================================
 import contextlib
 import io
 from pathlib import Path
@@ -42,7 +50,8 @@ class ObjectSizeTests(unittest.TestCase):
             for script in SCRIPTS:
                 with self.subTest(script=script):
                     labels = self.run_script(script, path, 2.5)
-                    self.assertEqual(labels, ["2.5 cm", "2.5 cm", "5.0 cm", "5.0 cm"])
+                    cm_labels = [l for l in labels if "cm" in l and "Kelompok" not in l]
+                    self.assertEqual(cm_labels, ["2.5 cm", "2.5 cm", "5.0 cm", "5.0 cm"])
 
     def test_width_must_be_positive_and_finite(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -1,3 +1,11 @@
+﻿# ==========================================================
+# UTS Machine Vision - Pengukuran Dimensi Objek
+# Kelompok 8
+#   1. Ahmad Bagus Idkholus Surur   (23050874166)
+#   2. Khairie Arrantisy            (23050874182)
+#   3. Muhammad Ilham Gymnastiar    (23050874169)
+#   4. Wahyu Rizki Agung Kurniawan  (23050874189)
+# ==========================================================
 from scipy.spatial import distance as dist
 from imutils import perspective
 from imutils import contours
@@ -18,7 +26,10 @@ def show_image(title, image, destroy_all=True):
 
 
 
-ap = argparse.ArgumentParser()
+ap = argparse.ArgumentParser(
+    description="UTS Machine Vision - Kelompok 8: pengukuran dimensi objek dengan OpenCV",
+    epilog="1. Ahmad Bagus Idkholus Surur (23050874166); 2. Khairie Arrantisy (23050874182); 3. Muhammad Ilham Gymnastiar (23050874169); 4. Wahyu Rizki Agung Kurniawan (23050874189)"
+)
 ap.add_argument("-i", "--image", required=True, help="path to the input image")
 ap.add_argument("-w", "--width", type=float, required=True, help="width of the left-most object in the image (in cm)")
 args = vars(ap.parse_args())
@@ -92,6 +103,9 @@ for c in cnts:
     cv2.putText(orig, "{:.1f} cm".format(dimA), (int(tltrX - 15), int(tltrY - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
     cv2.putText(orig, "{:.1f} cm".format(dimB), (int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
 
+    cv2.putText(orig, "Kelompok 8 - UTS Machine Vision",
+        (10, orig.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX,
+        0.5, (255, 255, 255), 1)
     cv2.imshow("Image", orig)
     cv2.waitKey(0)
 
