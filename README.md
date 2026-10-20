@@ -13,7 +13,7 @@ Proyek UTS Machine Vision.
 
 Repository ini dikembangkan dari proyek sumber yang tercantum di bagian kredit.
 
-Mengukur panjang dan lebar objek pada foto dengan referensi berukuran diketahui.
+Mengukur panjang dan lebar objek secara real-time via webcam dengan referensi berukuran diketahui.
 Input `--width` dan hasil pengukuran menggunakan **cm**.
 
 Inspired by [Pawan Bansal (hackbansu)](https://github.com/hackbansu) dan
@@ -26,7 +26,7 @@ Kode pengukuran diadaptasi dari [Practical-CV](https://github.com/Practical-CV/M
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python object_size.py --image images/sample_cm.png --width 2.5
+python object_size.py --width 2.5
 ```
 
 Di Windows PowerShell, buat dan aktifkan environment dengan perintah berikut,
@@ -42,7 +42,7 @@ benda yang ingin diukur. Contoh sintetis menggunakan referensi persegi 2.5 cm
 di kiri dan target 5 × 5 cm di kanan. Untuk foto sendiri, masukkan ukuran
 referensi yang benar dalam cm.
 
-Tekan tombol apa saja pada jendela gambar untuk melihat objek berikutnya.
+Tekan tombol 'q' pada jendela tampilan untuk keluar.
 `object_size_mine.py` menampilkan tahap edge dan morfologi sebelum pengukuran;
 parameter dan satuannya sama.
 
