@@ -13,7 +13,7 @@ Proyek UTS Machine Vision.
 
 Repository ini dikembangkan dari proyek sumber yang tercantum di bagian kredit.
 
-Mengukur panjang dan lebar objek secara real-time via webcam dengan referensi berukuran diketahui.
+Mengukur diameter objek lingkaran (seperti tutup botol atau botol) secara real-time via webcam dengan referensi berukuran diketahui.
 Input `--width` dan hasil pengukuran menggunakan **cm**.
 
 Inspired by [Pawan Bansal (hackbansu)](https://github.com/hackbansu) dan

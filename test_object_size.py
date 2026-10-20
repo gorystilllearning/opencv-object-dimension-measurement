@@ -10,7 +10,6 @@
 import contextlib
 import io
 import runpy
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -24,8 +23,9 @@ SCRIPTS = ("object_size.py", "object_size_mine.py")
 
 def make_frame():
     frame = np.zeros((320, 480, 3), dtype=np.uint8)
-    cv2.rectangle(frame, (20, 50),  (120, 150), (255, 255, 255), -1)
-    cv2.rectangle(frame, (200, 50), (400, 250), (255, 255, 255), -1)
+    cv2.circle(frame, (80, 160), 40, (255, 255, 255), -1)
+    cv2.circle(frame, (280, 160), 80, (255, 255, 255), -1)
+    cv2.rectangle(frame, (400, 50), (470, 250), (255, 255, 255), -1)
     return frame
 
 
@@ -67,7 +67,7 @@ class ObjectSizeTests(unittest.TestCase):
             with self.subTest(script=script):
                 all_labels = self.run_script(script, 2.5, [make_frame()])
                 cm_labels  = [l for l in all_labels if "cm" in l and "Kelompok" not in l]
-                self.assertEqual(cm_labels, ["2.5 cm", "2.5 cm", "5.0 cm", "5.0 cm"])
+                self.assertEqual(cm_labels, ["2.5 cm", "5.0 cm"])
 
     def test_width_must_be_positive_and_finite(self):
         for script in SCRIPTS:
