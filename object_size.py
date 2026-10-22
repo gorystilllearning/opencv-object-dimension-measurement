@@ -19,6 +19,19 @@ def midpoint(ptA, ptB):
     return ((ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5)
 
 
+def filter_outer_boxes(candidates):
+    candidates.sort(key=lambda d: d["area"], reverse=True)
+    kept = []
+    for cand in candidates:
+        x, y, w, h = cand["bbox"]
+        if not any(
+            x >= px - 5 and y >= py - 5 and (x + w) <= (px + pw + 5) and (y + h) <= (py + ph + 5)
+            for px, py, pw, ph in [k["bbox"] for k in kept]
+        ):
+            kept.append(cand)
+    return kept
+
+
 ap = argparse.ArgumentParser(
     description="UTS Machine Vision - Kelompok 8: pengukuran dimensi objek dengan OpenCV",
     epilog="1. Ahmad Bagus Idkholus Surur (23050874166); 2. Khairie Arrantisy (23050874182); "
@@ -49,32 +62,42 @@ while True:
         break
 
     orig = frame.copy()
-    gray = cv2.GaussianBlur(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (7, 7), 0)
-    edged = cv2.Canny(gray, 50, 100)
-    kernel = np.ones((3, 3), np.uint8)
-    morph = cv2.erode(cv2.dilate(edged, kernel, iterations=1), kernel, iterations=1)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    edged = cv2.Canny(blur, 30, 100)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    closed = cv2.morphologyEx(edged, cv2.MORPH_CLOSE, kernel, iterations=2)
 
     raw_cnts = imutils.grab_contours(
-        cv2.findContours(morph.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+        cv2.findContours(closed, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE))
 
     frame_area = frame.shape[0] * frame.shape[1]
-    boxes = []
+    candidates = []
 
     for c in raw_cnts:
         area = cv2.contourArea(c)
         if area < 800 or area > 0.85 * frame_area:
             continue
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.04 * peri, True)
-        rect = cv2.minAreaRect(c)
+        hull = cv2.convexHull(c)
+        peri = cv2.arcLength(hull, True)
+        approx = cv2.approxPolyDP(hull, 0.03 * peri, True)
+        rect = cv2.minAreaRect(hull)
         bw, bh = rect[1]
         if bw == 0 or bh == 0:
             continue
         extent = area / (bw * bh)
-        if 4 <= len(approx) <= 6 and cv2.isContourConvex(approx) and extent >= 0.68:
+        if 4 <= len(approx) <= 6 and extent >= 0.65:
             box = cv2.boxPoints(rect) if not imutils.is_cv2() else cv2.cv.BoxPoints(rect)
             box = perspective.order_points(np.array(box, dtype="int"))
-            boxes.append({"box": box, "cx": rect[0][0]})
+            bx, by, bw_i, bh_i = cv2.boundingRect(hull)
+            candidates.append({
+                "box": box,
+                "bbox": (bx, by, bw_i, bh_i),
+                "area": area,
+                "cx": rect[0][0]
+            })
+
+    boxes = filter_outer_boxes(candidates)
 
     if boxes:
         boxes.sort(key=lambda b: b["cx"])

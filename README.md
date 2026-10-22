@@ -1,4 +1,4 @@
-﻿# Pengukuran Dimensi Objek
+﻿# Pengukuran Dimensi Objek Real-Time (OpenCV)
 
 ## Identitas Kelompok 8
 
@@ -11,41 +11,57 @@ Proyek UTS Machine Vision.
 | 3  | Muhammad Ilham Gymnastiar     | 23050874169  |
 | 4  | Wahyu Rizki Agung Kurniawan   | 23050874189  |
 
-Repository ini dikembangkan dari proyek sumber yang tercantum di bagian kredit.
+Repository ini dikembangkan untuk deteksi dan pengukuran dimensi objek kotak (persegi / persegi panjang) secara real-time via webcam menggunakan OpenCV murni (tanpa dataset / tanpa YOLO).
 
-Mengukur panjang dan lebar objek kotak (persegi / persegi panjang) secara real-time via kamera/webcam dengan rumus konversi piksel ke cm.
+## Tabel Kalibrasi Jarak vs Piksel (1 cm Nyata)
 
-## Alur Deteksi (Tahapan OpenCV)
+Tabel konversi piksel ke 1 cm nyata pada kamera webcam standar (resolusi 640×480, FOV ~60°):
 
-```text
-Webcam Frame -> Grayscale -> Gaussian Blur -> Canny Edge -> Morfologi (Dilasi/Erosi) -> Find Contours -> Filter Bentuk Kotak -> Hitung Panjang/Lebar Piksel -> Rumus Konversi ke cm
-```
+| Jarak ke Kamera | Ukuran 1 cm di Layar | Nilai Skala (`--scale`) | Rekomendasi Kondisi |
+|:---:|:---:|:---:|:---|
+| **10 cm** | **55 piksel** | `55.0` | Sangat dekat (benda kecil / kartu rapat ke lensa) |
+| **15 cm** | **37 piksel** | `37.0` | Jarak dekat |
+| **20 cm** | **28 piksel** | `28.0` | Jarak sedang |
+| **25 cm** | **22 piksel** | `22.0` | Jarak genggam tangan nyaman (default) |
+| **30 cm** | **18 piksel** | `18.0` | Jarak meja kerja normal |
+| **40 cm** | **14 piksel** | `14.0` | Jarak jauh |
+| **50 cm** | **11 piksel** | `11.0` | Jarak sangat jauh (benda berukuran besar) |
 
-## Rumus Konversi
+## Rumus Perhitungan
 
-$$Panjang (cm) = \frac{Panjang (piksel)}{Skala (piksel/cm)}$$
-$$Lebar (cm) = \frac{Lebar (piksel)}{Skala (piksel/cm)}$$
+$$\text{Panjang (cm)} = \frac{\text{Panjang (piksel)}}{\text{Skala (px/cm)}}$$
 
-- Default skala: `20.0 px/cm` (cocok untuk jarak wajar webcam).
-- Tekan **`+`** atau **`-`** saat aplikasi berjalan untuk menaikkan/menurunkan skala secara live.
-- Atau masukkan parameter opsional: `python object_size.py --scale 25.0`
+$$\text{Lebar (cm)} = \frac{\text{Lebar (piksel)}}{\text{Skala (px/cm)}}$$
 
-## Menjalankan
+## Menjalankan Program
 
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+
+# Menjalankan dengan skala default (20.0 px/cm)
 python object_size.py
+
+# Menjalankan pada jarak 10 cm dari kamera (skala 55 px/cm)
+python object_size.py --scale 55.0
 ```
 
-### Tombol Interaktif
+### Kontrol Keyboard Interaktif
 
-- **`+`** : Tambah skala (+1 px/cm)
-- **`-`** : Kurangi skala (-1 px/cm)
-- **`q` / `Esc`** : Keluar dari program
+| Tombol | Fungsi |
+|:---:|:---|
+| **`+`** atau **`=`** | Menaikkan nilai skala (+1 px/cm) secara live |
+| **`-`** atau **`_`** | Menurunkan nilai skala (-1 px/cm) secara live |
+| **`q`** atau **`Esc`** | Menutup kamera dan keluar dari program |
 
-## Tes
+## Fitur Deteksi
+
+- **Convex Hull**: Merapikan tepi luar objek yang dipegang sehingga jari tangan tidak merusak bentuk kontur kotak.
+- **Supresi Kontur Dalam**: Mengeliminasi gambar/tulisan/logo di dalam benda agar hanya sisi terluar benda yang terukur.
+- **Pure Code (Ponytail Style)**: Kode ringkas, cepat, dan efisien tanpa dependensi berlebih.
+
+## Tes Unit
 
 ```powershell
 python -m unittest discover -v
