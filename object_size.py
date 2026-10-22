@@ -23,19 +23,25 @@ ap = argparse.ArgumentParser(
     description="UTS Machine Vision - Kelompok 8: pengukuran dimensi objek dengan OpenCV",
     epilog="1. Ahmad Bagus Idkholus Surur (23050874166); 2. Khairie Arrantisy (23050874182); "
            "3. Muhammad Ilham Gymnastiar (23050874169); 4. Wahyu Rizki Agung Kurniawan (23050874189)")
-ap.add_argument("-w", "--width", type=float, required=True,
-                help="lebar objek referensi paling kiri dalam frame (cm)")
+ap.add_argument("-s", "--scale", type=float, default=20.0,
+                help="skala konversi piksel per cm (default: 20.0 px/cm)")
+ap.add_argument("-w", "--width", type=float, default=None,
+                help="opsional: kalibrasi skala dari lebar objek referensi paling kiri (cm)")
 ap.add_argument("-c", "--camera", type=int, default=0,
                 help="index kamera (default: 0)")
 args = vars(ap.parse_args())
-if not np.isfinite(args["width"]) or args["width"] <= 0:
-    ap.error("--width harus bernilai positif dan finite dalam cm")
+
+if args["scale"] <= 0:
+    ap.error("--scale harus bernilai positif")
+
+scale = args["scale"]
+calibrated = False
 
 cap = cv2.VideoCapture(args["camera"])
 if not cap.isOpened():
     ap.error(f"kamera index {args['camera']} tidak dapat dibuka")
 
-print("Tekan 'q' untuk keluar.")
+print("Program berjalan. Tekan 'q' untuk keluar, '+' atau '-' untuk atur skala.")
 
 while True:
     ret, frame = cap.read()
@@ -45,24 +51,24 @@ while True:
     orig = frame.copy()
     gray = cv2.GaussianBlur(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (7, 7), 0)
     edged = cv2.Canny(gray, 50, 100)
-    edged = cv2.dilate(edged, None, iterations=1)
-    edged = cv2.erode(edged, None, iterations=1)
+    kernel = np.ones((3, 3), np.uint8)
+    morph = cv2.erode(cv2.dilate(edged, kernel, iterations=1), kernel, iterations=1)
 
     raw_cnts = imutils.grab_contours(
-        cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+        cv2.findContours(morph.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
 
     frame_area = frame.shape[0] * frame.shape[1]
     boxes = []
 
     for c in raw_cnts:
         area = cv2.contourArea(c)
-        if area < 800:
+        if area < 800 or area > 0.85 * frame_area:
             continue
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.04 * peri, True)
         rect = cv2.minAreaRect(c)
         bw, bh = rect[1]
-        if bw == 0 or bh == 0 or (bw * bh) > 0.85 * frame_area:
+        if bw == 0 or bh == 0:
             continue
         extent = area / (bw * bh)
         if 4 <= len(approx) <= 6 and cv2.isContourConvex(approx) and extent >= 0.68:
@@ -72,7 +78,16 @@ while True:
 
     if boxes:
         boxes.sort(key=lambda b: b["cx"])
-        pixelsPerMetric = None
+
+        if args["width"] is not None and not calibrated:
+            ref_box = boxes[0]["box"]
+            (tl, tr, br, bl) = ref_box
+            (tlblX, tlblY) = midpoint(tl, bl)
+            (trbrX, trbrY) = midpoint(tr, br)
+            ref_px = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
+            if ref_px > 0:
+                scale = ref_px / args["width"]
+                calibrated = True
 
         for item in boxes:
             box = item["box"]
@@ -95,24 +110,29 @@ while True:
 
             dA = dist.euclidean((tltrX, tltrY), (blbrX, blbrY))
             dB = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
-            if pixelsPerMetric is None:
-                pixelsPerMetric = dB / args["width"]
 
-            dimA = dA / pixelsPerMetric
-            dimB = dB / pixelsPerMetric
+            dimA = dA / scale
+            dimB = dB / scale
 
             cv2.putText(orig, f"{dimA:.1f} cm", (int(tltrX - 15), int(tltrY - 10)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2, cv2.LINE_AA)
             cv2.putText(orig, f"{dimB:.1f} cm", (int(trbrX + 10), int(trbrY)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2, cv2.LINE_AA)
 
-    cv2.putText(orig, f"Kotak: {len(boxes)}", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
+    cv2.putText(orig, f"Kotak: {len(boxes)} | Skala: {scale:.1f} px/cm", (15, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2, cv2.LINE_AA)
     cv2.putText(orig, "Kelompok 8 - UTS Machine Vision",
                 (10, orig.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
     cv2.imshow("Object Dimension Measurement", orig)
 
-    if cv2.waitKey(1) & 0xFF == ord("q"):
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord("q") or key == 27:
         break
+    elif key == ord("+") or key == ord("="):
+        scale += 1.0
+    elif key == ord("-") or key == ord("_"):
+        if scale > 1.0:
+            scale -= 1.0
 
 cap.release()
 cv2.destroyAllWindows()

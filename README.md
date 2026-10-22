@@ -13,62 +13,42 @@ Proyek UTS Machine Vision.
 
 Repository ini dikembangkan dari proyek sumber yang tercantum di bagian kredit.
 
-Mengukur panjang dan lebar objek kotak secara real-time via webcam dengan referensi berukuran diketahui.
-Input `--width` dan hasil pengukuran menggunakan **cm**.
+Mengukur panjang dan lebar objek kotak (persegi / persegi panjang) secara real-time via kamera/webcam dengan rumus konversi piksel ke cm.
 
-Inspired by [Pawan Bansal (hackbansu)](https://github.com/hackbansu) dan
-[Adrian Rosebrock](https://pyimagesearch.com/2016/03/28/measuring-size-of-objects-in-an-image-with-opencv/).
-Kode pengukuran diadaptasi dari [Practical-CV](https://github.com/Practical-CV/Measuring-Size-of-Objects-with-OpenCV).
+## Alur Deteksi (Tahapan OpenCV)
 
-## Menjalankan
-
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python object_size.py --width 2.5
+```text
+Webcam Frame -> Grayscale -> Gaussian Blur -> Canny Edge -> Morfologi (Dilasi/Erosi) -> Find Contours -> Filter Bentuk Kotak -> Hitung Panjang/Lebar Piksel -> Rumus Konversi ke cm
 ```
 
-Di Windows PowerShell, buat dan aktifkan environment dengan perintah berikut,
-lalu lanjutkan dua perintah `python` pada contoh di atas:
+## Rumus Konversi
+
+$$Panjang (cm) = \frac{Panjang (piksel)}{Skala (piksel/cm)}$$
+$$Lebar (cm) = \frac{Lebar (piksel)}{Skala (piksel/cm)}$$
+
+- Default skala: `20.0 px/cm` (cocok untuk jarak wajar webcam).
+- Tekan **`+`** atau **`-`** saat aplikasi berjalan untuk menaikkan/menurunkan skala secara live.
+- Atau masukkan parameter opsional: `python object_size.py --scale 25.0`
+
+## Menjalankan
 
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python object_size.py
 ```
 
-`--width` adalah lebar objek referensi **paling kiri**, dalam cm, bukan lebar
-benda yang ingin diukur. Contoh sintetis menggunakan referensi persegi 2.5 cm
-di kiri dan target 5 × 5 cm di kanan. Untuk foto sendiri, masukkan ukuran
-referensi yang benar dalam cm.
+### Tombol Interaktif
 
-Tekan tombol 'q' pada jendela tampilan untuk keluar.
-`object_size_mine.py` menampilkan tahap edge dan morfologi sebelum pengukuran;
-parameter dan satuannya sama.
-
-## Kondisi foto
-
-- Referensi dan benda berada pada bidang yang sama, tidak saling menutupi.
-- Kamera menghadap hampir tegak lurus ke bidang objek.
-- Background kontras agar tepi benda terdeteksi.
-- Ukuran dihitung dari kotak contour, bukan rekonstruksi 3D. Perspektif,
-  distorsi lensa, dan segmentasi dapat membuat hasil meleset.
-
-## Contoh hasil
-
-![Hasil pengukuran dalam cm](images/result_cm.png)
-
-Gambar sintetis untuk memeriksa perhitungan dan label cm, bukan hasil
-pengukuran benda fisik.
+- **`+`** : Tambah skala (+1 px/cm)
+- **`-`** : Kurangi skala (-1 px/cm)
+- **`q` / `Esc`** : Keluar dari program
 
 ## Tes
 
-```sh
+```powershell
 python -m unittest discover -v
 ```
-
-Tes memakai gambar sintetis tanpa membuka jendela. Akurasi foto nyata belum
-dikalibrasi.
-Repository sumber tidak mencantumkan lisensi; periksa izin sebelum distribusi ulang.
 
 Daftar anggota dan kredit lengkap: lihat [AUTHORS.md](AUTHORS.md).
