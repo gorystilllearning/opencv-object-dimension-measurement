@@ -19,8 +19,7 @@ def is_rectangular(pts):
     pts = pts.reshape(4, 2)
     for i in range(4):
         p0, p1, p2 = pts[i], pts[(i + 1) % 4], pts[(i + 2) % 4]
-        v1 = p0 - p1
-        v2 = p2 - p1
+        v1, v2 = p0 - p1, p2 - p1
         cos_th = abs(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-6))
         if cos_th > 0.35:
             return False
@@ -34,9 +33,9 @@ ap = argparse.ArgumentParser(
 ap.add_argument("-s", "--scale", type=float, default=20.0,
                 help="skala konversi piksel per cm (default: 20.0 px/cm)")
 ap.add_argument("-r", "--ref", type=float, default=8.5,
-                help="panjang acuan kalibrasi dalam cm (default: 8.5 cm untuk kartu ID/KTP)")
+                help="panjang acuan kalibrasi dalam cm (default: 8.5 cm)")
 ap.add_argument("-w", "--width", type=float, default=None,
-                help="opsional: kompatibilitas mundur lebar acuan kalibrasi (cm)")
+                help="opsional: kalibrasi skala dari lebar acuan (cm)")
 ap.add_argument("-c", "--camera", type=int, default=0,
                 help="index kamera (default: 0)")
 args = vars(ap.parse_args())
@@ -60,13 +59,15 @@ while True:
 
     orig = frame.copy()
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    edged = cv2.Canny(blur, 50, 150)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    closed = cv2.morphologyEx(edged, cv2.MORPH_CLOSE, kernel, iterations=2)
+    blur = cv2.GaussianBlur(gray, (7, 7), 0)
+    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    if thresh.mean() > 127:
+        thresh = cv2.bitwise_not(thresh)
 
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
+    mask = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
     raw_cnts = imutils.grab_contours(
-        cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+        cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
 
     frame_area = frame.shape[0] * frame.shape[1]
     boxes = []
@@ -75,18 +76,14 @@ while True:
         area = cv2.contourArea(c)
         if area < 1500 or area > 0.85 * frame_area:
             continue
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.035 * peri, True)
-        if len(approx) != 4 or not cv2.isContourConvex(approx):
+        hull = cv2.convexHull(c)
+        peri = cv2.arcLength(hull, True)
+        approx = cv2.approxPolyDP(hull, 0.035 * peri, True)
+        if len(approx) != 4 or not cv2.isContourConvex(approx) or not is_rectangular(approx):
             continue
-        if not is_rectangular(approx):
-            continue
-        rect = cv2.minAreaRect(c)
+        rect = cv2.minAreaRect(hull)
         bw, bh = rect[1]
-        if bw == 0 or bh == 0:
-            continue
-        extent = area / (bw * bh)
-        if extent < 0.70:
+        if bw == 0 or bh == 0 or (area / (bw * bh)) < 0.70:
             continue
         box = cv2.boxPoints(rect) if not imutils.is_cv2() else cv2.cv.BoxPoints(rect)
         box = perspective.order_points(np.array(box, dtype="int"))
@@ -113,12 +110,9 @@ while True:
             mid_x = int(np.mean(box[:, 0]))
             mid_y = int(np.mean(box[:, 1]))
 
-            label_p = f"P: {panjang_cm:.1f} cm ({int(panjang_px)}px)"
-            label_l = f"L: {lebar_cm:.1f} cm ({int(lebar_px)}px)"
-
-            cv2.putText(orig, label_p, (mid_x - 70, mid_y - 10),
+            cv2.putText(orig, f"P: {panjang_cm:.1f} cm ({int(panjang_px)}px)", (mid_x - 70, mid_y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(orig, label_l, (mid_x - 70, mid_y + 15),
+            cv2.putText(orig, f"L: {lebar_cm:.1f} cm ({int(lebar_px)}px)", (mid_x - 70, mid_y + 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 255), 2, cv2.LINE_AA)
 
     cv2.putText(orig, f"Kotak: {len(boxes)} | Skala: {scale:.1f} px/cm", (15, 30),
@@ -139,7 +133,7 @@ while True:
         longest_px = max(s1, s2)
         if longest_px > 0 and ref_len > 0:
             scale = longest_px / ref_len
-            print(f"Kalibrasi berhasil! Skala baru: {scale:.2f} px/cm (berdasarkan {ref_len} cm)")
+            print(f"Kalibrasi berhasil: {scale:.2f} px/cm")
     elif key == ord("+") or key == ord("="):
         scale += 0.5
     elif key == ord("-") or key == ord("_"):
