@@ -19,13 +19,6 @@ def midpoint(ptA, ptB):
     return ((ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5)
 
 
-def show_image(title, img, destroy=True):
-    cv2.imshow(title, img)
-    cv2.waitKey(1)
-    if destroy:
-        cv2.destroyWindow(title)
-
-
 ap = argparse.ArgumentParser(
     description="UTS Machine Vision - Kelompok 8: pengukuran dimensi objek dengan OpenCV",
     epilog="1. Ahmad Bagus Idkholus Surur (23050874166); 2. Khairie Arrantisy (23050874182); "
@@ -51,16 +44,12 @@ while True:
 
     orig = frame.copy()
     gray = cv2.GaussianBlur(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (7, 7), 0)
-    show_image("Gray", gray, destroy=False)
-
     edged = cv2.Canny(gray, 50, 100)
-    show_image("Canny Edge", edged, destroy=False)
-
-    morph = cv2.erode(cv2.dilate(edged, None, iterations=1), None, iterations=1)
-    show_image("Morphology", morph, destroy=False)
+    edged = cv2.dilate(edged, None, iterations=1)
+    edged = cv2.erode(edged, None, iterations=1)
 
     raw_cnts = imutils.grab_contours(
-        cv2.findContours(morph.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+        cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
 
     frame_area = frame.shape[0] * frame.shape[1]
     boxes = []
