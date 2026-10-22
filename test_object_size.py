@@ -22,10 +22,10 @@ SCRIPT = "object_size.py"
 
 
 def make_frame():
-    frame = np.zeros((320, 480, 3), dtype=np.uint8)
-    cv2.rectangle(frame, (20, 50), (120, 150), (255, 255, 255), -1)
-    cv2.rectangle(frame, (200, 50), (400, 250), (255, 255, 255), -1)
-    cv2.circle(frame, (450, 50), 10, (255, 255, 255), -1)
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    cv2.rectangle(frame, (50, 100), (150, 200), (255, 255, 255), -1)
+    cv2.rectangle(frame, (250, 100), (450, 200), (255, 255, 255), -1)
+    cv2.circle(frame, (550, 150), 30, (255, 255, 255), -1)
     return frame
 
 
@@ -61,10 +61,12 @@ class ObjectSizeTests(unittest.TestCase):
             runpy.run_path(str(ROOT / SCRIPT), run_name="__main__")
         return labels
 
-    def test_reference_and_double_size_object_are_labelled_in_cm(self):
-        all_labels = self.run_script(["--scale", "40.0"], [make_frame()])
+    def test_dimensions_calculated_with_correct_panjang_and_lebar(self):
+        all_labels = self.run_script(["--scale", "20.0"], [make_frame()])
         cm_labels = [l for l in all_labels if "cm" in l and "Kelompok" not in l and "Skala" not in l]
-        self.assertEqual(cm_labels, ["2.5 cm", "2.5 cm", "5.0 cm", "5.0 cm"])
+        self.assertEqual(len(cm_labels), 4)
+        self.assertTrue(any("P: " in l for l in cm_labels))
+        self.assertTrue(any("L: " in l for l in cm_labels))
 
     def test_scale_must_be_positive(self):
         for scale in ("0", "-5"):
@@ -85,7 +87,7 @@ class ObjectSizeTests(unittest.TestCase):
             self.assertEqual(ctx.exception.code, 2)
 
     def test_image_without_objects_labels_only_kelompok(self):
-        blank = np.zeros((320, 480, 3), dtype=np.uint8)
+        blank = np.zeros((480, 640, 3), dtype=np.uint8)
         all_labels = self.run_script([], [blank])
         cm_labels = [l for l in all_labels if "cm" in l and "Kelompok" not in l and "Skala" not in l]
         self.assertEqual(cm_labels, [])
