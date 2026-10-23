@@ -7,138 +7,184 @@
 #   4. Wahyu Rizki Agung Kurniawan  (23050874189)
 # ==========================================================
 
-from scipy.spatial import distance as dist
-from imutils import perspective
 import argparse
-import imutils
+
 import cv2
 import numpy as np
 
 
+WINDOW = "Object Dimension Measurement"
+BLUR_KERNEL = (7, 7)
+MORPH_KERNEL = (9, 9)
+MIN_CONTOUR_AREA = 1500
+MAX_FRAME_AREA_RATIO = 0.85
+APPROX_EPSILON_RATIO = 0.035
+MIN_EXTENT = 0.70
+MAX_ANGLE_COSINE = 0.35
+SCALE_STEP = 0.5
+
+
 def is_rectangular(pts):
+    pts = np.asarray(pts, dtype=np.float64)
+    if pts.shape not in ((4, 2), (4, 1, 2)) or not np.isfinite(pts).all():
+        return False
     pts = pts.reshape(4, 2)
     for i in range(4):
         p0, p1, p2 = pts[i], pts[(i + 1) % 4], pts[(i + 2) % 4]
         v1, v2 = p0 - p1, p2 - p1
-        cos_th = abs(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-6))
-        if cos_th > 0.35:
+        denominator = np.linalg.norm(v1) * np.linalg.norm(v2)
+        if denominator == 0:
+            return False
+        cos_th = abs(np.dot(v1, v2) / denominator)
+        if cos_th > MAX_ANGLE_COSINE:
             return False
     return True
 
 
-ap = argparse.ArgumentParser(
-    description="UTS Machine Vision - Kelompok 8: pengukuran dimensi objek dengan OpenCV",
-    epilog="1. Ahmad Bagus Idkholus Surur (23050874166); 2. Khairie Arrantisy (23050874182); "
-           "3. Muhammad Ilham Gymnastiar (23050874169); 4. Wahyu Rizki Agung Kurniawan (23050874189)")
-ap.add_argument("-s", "--scale", type=float, default=20.0,
-                help="skala konversi piksel per cm (default: 20.0 px/cm)")
-ap.add_argument("-r", "--ref", type=float, default=8.5,
-                help="panjang acuan kalibrasi dalam cm (default: 8.5 cm)")
-ap.add_argument("-w", "--width", type=float, default=None,
-                help="opsional: kalibrasi skala dari lebar acuan (cm)")
-ap.add_argument("-c", "--camera", type=int, default=0,
-                help="index kamera (default: 0)")
-args = vars(ap.parse_args())
+def positive_number(value):
+    number = float(value)
+    if not np.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("nilai harus positif dan finite")
+    return number
 
-if args["scale"] <= 0:
-    ap.error("--scale harus bernilai positif")
 
-scale = args["scale"]
-ref_len = args["width"] if args["width"] is not None else args["ref"]
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="UTS Machine Vision - Kelompok 8: pengukuran dimensi objek dengan OpenCV",
+        epilog="1. Ahmad Bagus Idkholus Surur (23050874166); 2. Khairie Arrantisy (23050874182); "
+               "3. Muhammad Ilham Gymnastiar (23050874169); 4. Wahyu Rizki Agung Kurniawan (23050874189)")
+    parser.add_argument("-s", "--scale", type=positive_number, default=20.0,
+                        help="skala awal/manual px/cm, bukan hasil kalibrasi (default: 20)")
+    parser.add_argument("-r", "--ref", "--reference-length", dest="reference_length",
+                        type=positive_number, default=8.5,
+                        help="sisi terpanjang referensi dalam cm (default: 8.5)")
+    parser.add_argument("-w", "--width", type=positive_number, default=None,
+                        help="opsi lama untuk panjang referensi; menggantikan --ref")
+    parser.add_argument("-c", "--camera", type=int, default=0, help="index kamera (default: 0)")
+    args = parser.parse_args(argv)
+    if args.camera < 0:
+        parser.error("--camera tidak boleh negatif")
+    if args.width is not None:
+        args.reference_length = args.width
+    return parser, args
 
-cap = cv2.VideoCapture(args["camera"])
-if not cap.isOpened():
-    ap.error(f"kamera index {args['camera']} tidak dapat dibuka")
 
-print("Program berjalan. Tekan 'k' kalibrasi, '+/-' atur skala, 'q' keluar.")
+def box_sides(box):
+    box = np.asarray(box, dtype=np.float64)
+    if box.shape != (4, 2) or not np.isfinite(box).all():
+        raise ValueError("Koordinat kotak tidak valid")
+    sides = sorted((float(np.linalg.norm(box[1] - box[0])),
+                    float(np.linalg.norm(box[2] - box[1]))), reverse=True)
+    if sides[1] <= 0:
+        raise ValueError("Panjang sisi kotak harus positif")
+    return sides
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
 
-    orig = frame.copy()
+def detect_boxes(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (7, 7), 0)
+    blur = cv2.GaussianBlur(gray, BLUR_KERNEL, 0)
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     if thresh.mean() > 127:
         thresh = cv2.bitwise_not(thresh)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, MORPH_KERNEL)
     mask = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
-    raw_cnts = imutils.grab_contours(
-        cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     frame_area = frame.shape[0] * frame.shape[1]
     boxes = []
 
-    for c in raw_cnts:
-        area = cv2.contourArea(c)
-        if area < 1500 or area > 0.85 * frame_area:
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < MIN_CONTOUR_AREA or area > MAX_FRAME_AREA_RATIO * frame_area:
             continue
-        hull = cv2.convexHull(c)
-        peri = cv2.arcLength(hull, True)
-        approx = cv2.approxPolyDP(hull, 0.035 * peri, True)
+        hull = cv2.convexHull(contour)
+        perimeter = cv2.arcLength(hull, True)
+        approx = cv2.approxPolyDP(hull, APPROX_EPSILON_RATIO * perimeter, True)
         if len(approx) != 4 or not cv2.isContourConvex(approx) or not is_rectangular(approx):
             continue
         rect = cv2.minAreaRect(hull)
         bw, bh = rect[1]
-        if bw == 0 or bh == 0 or (area / (bw * bh)) < 0.70:
+        if bw == 0 or bh == 0 or (area / (bw * bh)) < MIN_EXTENT:
             continue
-        box = cv2.boxPoints(rect) if not imutils.is_cv2() else cv2.cv.BoxPoints(rect)
-        box = perspective.order_points(np.array(box, dtype="int"))
+        box = cv2.boxPoints(rect)
         boxes.append({"box": box, "cx": rect[0][0], "area": area})
 
-    if boxes:
-        boxes.sort(key=lambda b: b["cx"])
+    boxes.sort(key=lambda item: item["cx"])
+    return boxes
 
-        for item in boxes:
-            box = item["box"]
-            cv2.drawContours(orig, [box.astype("int")], -1, (0, 255, 0), 2)
 
-            for (x, y) in box:
-                cv2.circle(orig, (int(x), int(y)), 4, (0, 0, 255), -1)
+def calibrate_scale(boxes, reference_length_cm):
+    if not np.isfinite(reference_length_cm) or reference_length_cm <= 0:
+        raise ValueError("Panjang referensi harus positif dan finite")
+    if not boxes:
+        raise ValueError("Kalibrasi gagal: tidak ada kotak terdeteksi")
+    largest = max(boxes, key=lambda item: item["area"])
+    length_px, _ = box_sides(largest["box"])
+    return length_px / reference_length_cm
 
-            s1 = dist.euclidean(box[0], box[1])
-            s2 = dist.euclidean(box[1], box[2])
-            panjang_px = max(s1, s2)
-            lebar_px = min(s1, s2)
 
-            panjang_cm = panjang_px / scale
-            lebar_cm = lebar_px / scale
-
-            mid_x = int(np.mean(box[:, 0]))
-            mid_y = int(np.mean(box[:, 1]))
-
-            cv2.putText(orig, f"P: {panjang_cm:.1f} cm ({int(panjang_px)}px)", (mid_x - 70, mid_y - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(orig, f"L: {lebar_cm:.1f} cm ({int(lebar_px)}px)", (mid_x - 70, mid_y + 15),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 255), 2, cv2.LINE_AA)
-
-    cv2.putText(orig, f"Kotak: {len(boxes)} | Skala: {scale:.1f} px/cm", (15, 30),
+def draw_frame(frame, boxes, scale, status):
+    result = frame.copy()
+    for item in boxes:
+        box = item["box"]
+        cv2.drawContours(result, [box.astype(np.int32)], -1, (0, 255, 0), 2)
+        for x, y in box:
+            cv2.circle(result, (int(x), int(y)), 4, (0, 0, 255), -1)
+        length_px, width_px = box_sides(box)
+        mid_x, mid_y = np.mean(box, axis=0).astype(int)
+        for prefix, pixels, offset in (("P", length_px, -10), ("L", width_px, 15)):
+            cv2.putText(result, f"{prefix}: {pixels / scale:.1f} cm ({int(pixels)}px)",
+                        (int(mid_x) - 70, int(mid_y) + offset), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.60, (0, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(result, f"Kotak: {len(boxes)} | Skala: {scale:.1f} px/cm", (15, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2, cv2.LINE_AA)
-    cv2.putText(orig, "[k] Kalibrasi | [+/-] Skala | [q] Keluar", (15, 60),
+    cv2.putText(result, "[k] Kalibrasi | [+/-] Skala | [q] Keluar", (15, 60),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.putText(orig, "Kelompok 8 - UTS Machine Vision",
-                (10, orig.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.imshow("Object Dimension Measurement", orig)
+    cv2.putText(result, status, (15, 85), cv2.FONT_HERSHEY_SIMPLEX,
+                0.5, (0, 255, 255), 1, cv2.LINE_AA)
+    cv2.putText(result, "Kelompok 8 - UTS Machine Vision",
+                (10, result.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+    return result
 
-    key = cv2.waitKey(1) & 0xFF
-    if key == ord("q") or key == 27:
-        break
-    elif key == ord("k") and boxes:
-        largest = max(boxes, key=lambda b: b["area"])["box"]
-        s1 = dist.euclidean(largest[0], largest[1])
-        s2 = dist.euclidean(largest[1], largest[2])
-        longest_px = max(s1, s2)
-        if longest_px > 0 and ref_len > 0:
-            scale = longest_px / ref_len
-            print(f"Kalibrasi berhasil: {scale:.2f} px/cm")
-    elif key == ord("+") or key == ord("="):
-        scale += 0.5
-    elif key == ord("-") or key == ord("_"):
-        if scale > 1.0:
-            scale -= 0.5
 
-cap.release()
-cv2.destroyAllWindows()
+def main(argv=None):
+    parser, args = parse_args(argv)
+    cap = cv2.VideoCapture(args.camera)
+    try:
+        if not cap.isOpened():
+            parser.error(f"kamera index {args.camera} tidak dapat dibuka; periksa izin Camera")
+        scale = args.scale
+        status = "Skala awal/manual; tekan k dengan referensi sebagai kotak terbesar"
+        print("k: kalibrasi | +/-: skala manual | q/Esc: keluar")
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                print("Gagal membaca frame kamera.")
+                return 1
+            boxes = detect_boxes(frame)
+            cv2.imshow(WINDOW, draw_frame(frame, boxes, scale, status))
+            key = cv2.waitKey(1) & 0xFF
+            if key in (ord("q"), ord("Q"), 27):
+                return 0
+            if key in (ord("k"), ord("K")):
+                try:
+                    scale = calibrate_scale(boxes, args.reference_length)
+                except ValueError as error:
+                    status = str(error)
+                else:
+                    status = "Skala dari kalibrasi referensi; kamera harus tetap diam"
+                    print(f"Kalibrasi berhasil: {scale:.2f} px/cm")
+            elif key in (ord("+"), ord("=")):
+                scale += SCALE_STEP
+                status = "Skala diubah manual; validasi dengan penggaris"
+            elif key in (ord("-"), ord("_")) and scale > SCALE_STEP:
+                scale -= SCALE_STEP
+                status = "Skala diubah manual; validasi dengan penggaris"
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
